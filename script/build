@@ -1,0 +1,76 @@
+#!/bin/bash
+#
+#  Copyright (c) 2020, Lukasz Duda.
+#  All rights reserved.
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#  1. Redistributions of source code must retain the above copyright
+#     notice, this list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright
+#     notice, this list of conditions and the following disclaimer in the
+#     documentation and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the
+#     names of its contributors may be used to endorse or promote products
+#     derived from this software without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+#  Preparing RPi on QEMU.
+#
+
+set -exo pipefail
+
+IMAGE_FILE=images/raspbian.img
+WORK_DIR=tmp
+OUTPUT_DIR=output
+MEDIA_DIR=/media/rpi
+RPI_EMU_DIR=third_party/docker-rpi-emu/scripts
+
+init()
+{
+    [ -d "$WORK_DIR" ] || mkdir -p "$WORK_DIR"
+    [ -d "$OUTPUT_DIR" ] || mkdir -p "$OUTPUT_DIR"
+
+    cp -v "$IMAGE_FILE" "$WORK_DIR"/raspbian.img
+
+    sudo mkdir -p "$MEDIA_DIR"
+
+    sudo ./"$RPI_EMU_DIR"/mount.sh "$WORK_DIR"/raspbian.img "$MEDIA_DIR" &&
+    sudo cp -v script/_nrfutil "$MEDIA_DIR"/home/pi/build_nrfutil.sh &&
+    sudo ./"$RPI_EMU_DIR"/qemu-setup.sh "$MEDIA_DIR" &&
+    sudo chroot "$MEDIA_DIR" /bin/bash /home/pi/build_nrfutil.sh &&
+    sudo cp -v "$MEDIA_DIR"/home/pi/output/* "$OUTPUT_DIR" || die
+}
+
+deinit()
+{
+    sudo ./"$RPI_EMU_DIR"/qemu-cleanup.sh "$MEDIA_DIR" || true
+    sudo umount -lf "$MEDIA_DIR" || true
+    sudo ./"$RPI_EMU_DIR"/unmount.sh "$MEDIA_DIR" || true
+    sudo rm -rf "$MEDIA_DIR"
+}
+
+die()
+{
+    deinit
+    exit 1
+}
+
+main()
+{
+    init
+    deinit
+}
+
+main

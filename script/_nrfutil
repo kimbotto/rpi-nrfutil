@@ -1,0 +1,79 @@
+#!/bin/bash
+#
+#  Copyright (c) 2020, Lukasz Duda.
+#  All rights reserved.
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#  1. Redistributions of source code must retain the above copyright
+#     notice, this list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright
+#     notice, this list of conditions and the following disclaimer in the
+#     documentation and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the
+#     names of its contributors may be used to endorse or promote products
+#     derived from this software without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+#  Building nrfutil executable on RaspPi.
+#
+
+set -exo pipefail
+
+install_packages()
+{
+    echo 'Downloading package information from configured sources..'
+    sudo apt-get update --allow-releaseinfo-change
+    sudo apt update -y
+
+    echo 'Installing required dependency...'
+    sudo apt-get install --no-install-recommends --allow-unauthenticated --fix-missing -y \
+        python3-pip python3-dev
+
+    sudo python3.7 -m pip install pyinstaller
+}
+
+build_nrfutil()
+{
+    if [ -z $NRFUTIL_URL]
+    then
+        NRFUTIL_URL=https://github.com/NordicSemiconductor/pc-nrfutil/archive/v6.1.zip
+    fi
+
+    echo 'Downloading nrfutil source code...'
+    wget -O nrfutil.zip $NRFUTIL_URL
+    unzip -o nrfutil.zip
+    cd pc-nrfutil*
+
+    # pc-ble-driver-py in versions above 0.11.4 cannot be used for RaspPi building.
+    sed -i 's/pc_ble_driver_py.*$/pc_ble_driver_py==0.11.4/g' requirements.txt
+
+    echo 'Preparing nrfutil executable...'
+    python3.7 setup.py install
+    nrfutil --help
+
+    sudo pyinstaller nrfutil.spec
+    ./dist/nrfutil --help
+
+    mkdir -p /home/pi/output
+    cp -v ./dist/* /home/pi/output
+}
+
+main()
+{
+    install_packages
+    build_nrfutil
+}
+
+main
