@@ -58,6 +58,7 @@ build_nrfutil()
 
     # pc-ble-driver-py in versions above 0.11.4 cannot be used for RaspPi building.
     sed -i 's/pc_ble_driver_py.*$/pc_ble_driver_py==0.11.4/g' requirements.txt
+    sed -i 's/pyyaml.*$/pyyaml==6.0.1/g' requirements.txt
 
     echo 'Preparing nrfutil executable...'
     python3.7 setup.py install
